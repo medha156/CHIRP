@@ -1,0 +1,94 @@
+[project]
+name = "chirp"
+version = "0.1.0"
+description = "Bird species classification from short video clips using Video Swin-T and EfficientNet-B3"
+authors = [
+    {name = "Your Name", email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+
+dependencies = [
+    # Deep learning core
+    "torch>=2.2.0,<2.5.0",
+    "torchvision>=0.17.0,<0.20.0",
+    "timm>=1.0.0,<2.0.0",
+
+    # Video decoding (fast, GPU-accelerated alternative to OpenCV for clips)
+    "decord>=0.6.0",
+    "opencv-python>=4.9.0,<5.0.0",
+
+    # Numerical / data
+    "numpy>=1.26.0,<2.0.0",
+    "pandas>=2.2.0,<3.0.0",
+
+    # Classical ML & boosting
+    "scikit-learn>=1.4.0,<2.0.0",
+    "xgboost>=2.0.0,<3.0.0",
+
+    # Explainability
+    "shap>=0.45.0,<1.0.0",
+
+    # Augmentation
+    "albumentations>=1.4.0,<2.0.0",
+
+    # Visualisation
+    "matplotlib>=3.8.0,<4.0.0",
+    "seaborn>=0.13.0,<1.0.0",
+
+    # Experiment tracking
+    "wandb>=0.17.0,<1.0.0",
+
+    # Utilities
+    "tqdm>=4.66.0,<5.0.0",
+    "einops>=0.8.0,<1.0.0",
+    "pyyaml>=6.0.1,<7.0.0",
+    "ipykernel>=6.29.0,<7.0.0",
+    "jupyter>=1.1.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0,<9.0.0",
+    "pytest-cov>=5.0.0,<6.0.0",
+    "black>=24.0.0,<25.0.0",
+    "ruff>=0.4.0,<1.0.0",
+    "mypy>=1.10.0,<2.0.0",
+]
+
+[project.scripts]
+chirp-train   = "chirp.pipelines.train:main"
+chirp-eval    = "chirp.pipelines.evaluate:main"
+chirp-infer   = "chirp.pipelines.infer:main"
+
+[tool.poetry]
+packages = [{include = "chirp", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# ---------------------------------------------------------------------------
+# Tool configs
+# ---------------------------------------------------------------------------
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+strict = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src/chirp --cov-report=term-missing -q"
