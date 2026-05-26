@@ -155,24 +155,38 @@ def imagenet_normalize(
     mean: Sequence[float] = IMAGENET_MEAN,
     std: Sequence[float] = IMAGENET_STD,
 ) -> Tensor:
-    """Apply ``(x − mean) / std`` with ImageNet statistics.
+    """Apply ``(x − mean) / std`` to the first ``len(mean)`` channels.
 
     Broadcasts over any layout that ends in ``[..., C, H, W]``.
+
+    When the input has **more** channels than ``mean`` (e.g. RGB + 2
+    optical-flow channels → 5 channels), only the leading ``len(mean)``
+    are normalised; the trailing channels pass through untouched. This
+    lets the optical-flow concatenation happen *before* the colour
+    normalisation step without breaking the pipeline.
     """
     _validate_dtype(frames)
 
-    if frames.shape[-3] != len(mean):
+    c_total = frames.shape[-3]
+    c_norm  = len(mean)
+    if c_total < c_norm:
         raise ValueError(
-            f"Channel dim must equal {len(mean)} (RGB), "
-            f"got {frames.shape[-3]} from shape {tuple(frames.shape)}"
+            f"Need at least {c_norm} channels (RGB), got {c_total} "
+            f"from shape {tuple(frames.shape)}"
         )
 
     m = torch.as_tensor(mean, dtype=frames.dtype, device=frames.device)
     s = torch.as_tensor(std,  dtype=frames.dtype, device=frames.device)
+    view = (1,) * (frames.ndim - 3) + (c_norm, 1, 1)
 
-    # Shape mean/std to broadcast over the spatial + any leading dims.
-    view = (1,) * (frames.ndim - 3) + (len(mean), 1, 1)
-    return (frames - m.view(*view)) / s.view(*view)
+    if c_total == c_norm:
+        # Fast path — exact match, no slicing.
+        return (frames - m.view(*view)) / s.view(*view)
+
+    rgb   = frames[..., :c_norm, :, :]
+    extra = frames[..., c_norm:, :, :]
+    rgb   = (rgb - m.view(*view)) / s.view(*view)
+    return torch.cat([rgb, extra], dim=-3)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,54 @@
+# Example CHIRP training config — the Swin-T + EB3 fusion ensemble.
+# Run with:
+#   python training/train.py --config configs/fusion.yaml
+#
+# Override individual fields without editing the file:
+#   python training/train.py --config configs/fusion.yaml \
+#       --override optim.lr=5e-4 model.dropout=0.4 data.use_optical_flow=true
+
+seed: 42
+num_epochs: 50
+output_dir: outputs/runs/fusion_baseline
+early_stopping_patience: 10
+early_stopping_metric: val_f1
+device: auto
+
+data:
+  data_root: data/
+  datasets: [fbd_sv_2024, vb100]
+  splits: [0.70, 0.15, 0.15]
+  batch_size: 16
+  num_workers: 4
+  num_frames: 16
+  height: 224
+  width: 224
+  backend: auto
+  balance_sampler: false
+  use_optical_flow: false           # toggle for ablation
+  optical_flow_backend: farneback
+  raft_model: small
+
+model:
+  model_type: fusion                # swin | efficientnet | fusion | baseline_rf | baseline_xgb | baseline_knn
+  pretrained: true
+  freeze_backbone: false
+  hidden_dim: 512
+  dropout: 0.3
+  n_keyframes: 4
+  num_classes: 20
+
+optim:
+  lr: 1.0e-4
+  weight_decay: 5.0e-2
+  warmup_epochs: 3
+  min_lr: 1.0e-6
+  grad_clip: 1.0
+  label_smoothing: 0.1
+
+log:
+  wandb: false
+  wandb_project: chirp
+  wandb_run_name: null
+  wandb_entity: null
+  results_csv: outputs/results.csv
+  log_every: 20
