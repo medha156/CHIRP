@@ -49,27 +49,31 @@ logger = logging.getLogger(__name__)
 # Class registry (matches CLAUDE.md)
 # ---------------------------------------------------------------------------
 
+# Stanford campus species list — Bay Area oak-woodland + urban species
+# reliably observed across the Main Quad, Arboretum, the Dish, and
+# San Francisquito Creek. Alphabetised so class indices are stable and
+# predictable from the name alone.
 SPECIES: list[str] = [
-    "American Robin",           # 0
-    "Baltimore Oriole",         # 1
-    "Black-capped Chickadee",   # 2
-    "Blue Jay",                 # 3
-    "Canada Goose",             # 4
-    "Cedar Waxwing",            # 5
-    "Common Grackle",           # 6
-    "Dark-eyed Junco",          # 7
-    "Downy Woodpecker",         # 8
-    "House Finch",              # 9
-    "Northern Cardinal",        # 10
-    "Pileated Woodpecker",      # 11
-    "Red-tailed Hawk",          # 12
-    "Ruby-throated Hummingbird",# 13
-    "Song Sparrow",             # 14
-    "Tufted Titmouse",          # 15
-    "White-breasted Nuthatch",  # 16
-    "Wild Turkey",              # 17
-    "Wood Duck",                # 18
-    "Yellow Warbler",           # 19
+    "Acorn Woodpecker",          # 0
+    "American Crow",             # 1
+    "American Robin",            # 2
+    "Anna's Hummingbird",        # 3
+    "Black Phoebe",              # 4
+    "Brewer's Blackbird",        # 5
+    "Bushtit",                   # 6
+    "California Scrub-Jay",      # 7
+    "California Towhee",         # 8
+    "Chestnut-backed Chickadee", # 9
+    "Cooper's Hawk",             # 10
+    "Dark-eyed Junco",           # 11
+    "House Finch",               # 12
+    "Lesser Goldfinch",          # 13
+    "Mourning Dove",             # 14
+    "Northern Mockingbird",      # 15
+    "Oak Titmouse",              # 16
+    "Red-tailed Hawk",           # 17
+    "White-crowned Sparrow",     # 18
+    "Yellow-rumped Warbler",     # 19
 ]
 NUM_CLASSES: int = len(SPECIES)
 

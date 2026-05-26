@@ -11,20 +11,24 @@ CHIRP classifies bird species from short video clips (2–10 seconds) using a du
 
 The outputs are fused via learned attention weighting for a final 20-class prediction.
 
-## Target Classes (20 species)
+## Target Classes (20 species — Stanford campus)
+
+Species chosen from the Bay Area oak-woodland + urban avifauna reliably
+observed across the Main Quad, Arboretum, the Dish, and San Francisquito
+Creek. Alphabetised so class indices are predictable from the name alone.
 
 | # | Species | # | Species |
 |---|---------|---|---------|
-| 0 | American Robin | 10 | Northern Cardinal |
-| 1 | Baltimore Oriole | 11 | Pileated Woodpecker |
-| 2 | Black-capped Chickadee | 12 | Red-tailed Hawk |
-| 3 | Blue Jay | 13 | Ruby-throated Hummingbird |
-| 4 | Canada Goose | 14 | Song Sparrow |
-| 5 | Cedar Waxwing | 15 | Tufted Titmouse |
-| 6 | Common Grackle | 16 | White-breasted Nuthatch |
-| 7 | Dark-eyed Junco | 17 | Wild Turkey |
-| 8 | Downy Woodpecker | 18 | Wood Duck |
-| 9 | House Finch | 19 | Yellow Warbler |
+| 0 | Acorn Woodpecker | 10 | Cooper's Hawk |
+| 1 | American Crow | 11 | Dark-eyed Junco |
+| 2 | American Robin | 12 | House Finch |
+| 3 | Anna's Hummingbird | 13 | Lesser Goldfinch |
+| 4 | Black Phoebe | 14 | Mourning Dove |
+| 5 | Brewer's Blackbird | 15 | Northern Mockingbird |
+| 6 | Bushtit | 16 | Oak Titmouse |
+| 7 | California Scrub-Jay | 17 | Red-tailed Hawk |
+| 8 | California Towhee | 18 | White-crowned Sparrow |
+| 9 | Chestnut-backed Chickadee | 19 | Yellow-rumped Warbler |
 
 ## Directory Layout
 
