@@ -6,17 +6,29 @@ EfficientNet-B3 frame encoder for CHIRP.
 - Loads ``timm/efficientnet_b3`` (ImageNet pretrained by default) with the
   classifier removed (``num_classes=0``) so the backbone returns a 1536-D
   feature vector per frame.
-- Encodes each frame independently, then averages embeddings over the
-  ``T`` time dimension to produce a single ``[B, 1536]`` clip embedding.
+- Encodes each frame independently, then **pools embeddings across T**
+  using one of three strategies (selected via the ``pool`` argument):
+
+  ===============  =========================================================
+  ``pool``         Description
+  ===============  =========================================================
+  ``"mean"``       Arithmetic mean over T (default; CLAUDE.md baseline).
+  ``"max"``        Element-wise max over T (cheap ablation).
+  ``"attention"``  Learned soft-attention weights — a small ``Linear(F, 1)``
+                   head produces per-frame logits that are softmax-pooled,
+                   then used to weight-average the frames. Adds ~F+1 params.
+  ===============  =========================================================
+
 - Optional ``freeze`` flag for fast baseline experiments where the
-  backbone is treated as a fixed feature extractor.
+  backbone is treated as a fixed feature extractor. Attention-pool
+  parameters remain trainable even when ``freeze=True``.
 
 Input shape
 -----------
 ``[B, T, C, H, W]``  *or*  ``[B·T, C, H, W]`` (the flat layout produced by
 ``pipelines.preprocess.to_efficientnet_layout``). When given the flat
 layout you must pass ``T`` explicitly so the module can un-flatten before
-the temporal mean pool.
+the temporal pool.
 """
 
 from __future__ import annotations
@@ -30,19 +42,43 @@ from torch import Tensor, nn
 logger = logging.getLogger(__name__)
 
 
+class _AttentionPool(nn.Module):
+    """Soft-attention pool over the time axis.
+
+    Given ``[B, T, F]`` features, learns a ``Linear(F, 1)`` to produce
+    per-frame logits, softmaxes over T, and returns the weighted sum
+    ``[B, F]``. Cheap (F+1 params) and strictly more expressive than
+    mean / max.
+    """
+
+    def __init__(self, feature_dim: int) -> None:
+        super().__init__()
+        self.score = nn.Linear(feature_dim, 1)
+
+    def forward(self, feats: Tensor) -> Tensor:               # [B, T, F]
+        weights = self.score(feats).softmax(dim=1)            # [B, T, 1]
+        return (weights * feats).sum(dim=1)                   # [B, F]
+
+
 class EfficientNetB3Encoder(nn.Module):
-    """Per-frame EfficientNet-B3 encoder with temporal mean pooling.
+    """Per-frame EfficientNet-B3 encoder with configurable temporal pooling.
 
     Parameters
     ----------
     pretrained:
         Load ImageNet weights via timm. Disable for fast smoke tests.
     pool:
-        Temporal pooling op applied across T frames. ``"mean"`` (default)
-        matches CLAUDE.md; ``"max"`` is provided for ablation.
+        Temporal pooling strategy. One of:
+
+        - ``"mean"`` — arithmetic mean (default, matches CLAUDE.md).
+        - ``"max"``  — element-wise max.
+        - ``"attention"`` — learned soft-attention weights via
+          :class:`_AttentionPool`. Adds ``feature_dim + 1`` trainable
+          parameters; remains trainable even when ``freeze=True``.
     freeze:
         Freeze all backbone parameters at construction time. Useful for
-        the classical-ML baselines in ``models.baselines``.
+        the classical-ML baselines in ``models.baselines``. The
+        attention-pool head (if any) is NOT frozen.
     num_classes:
         If ``> 0``, a final ``Linear(1536, num_classes)`` head is appended
         and ``forward()`` returns logits. If ``0`` (default), ``forward()``
@@ -60,7 +96,7 @@ class EfficientNetB3Encoder(nn.Module):
     def __init__(
         self,
         pretrained: bool = True,
-        pool: Literal["mean", "max"] = "mean",
+        pool: Literal["mean", "max", "attention"] = "mean",
         freeze: bool = False,
         num_classes: int = 0,
     ) -> None:
@@ -89,9 +125,15 @@ class EfficientNetB3Encoder(nn.Module):
             )
             self.FEATURE_DIM = actual_dim
 
-        if pool not in ("mean", "max"):
-            raise ValueError(f"pool must be 'mean' or 'max'; got {pool!r}")
+        if pool not in ("mean", "max", "attention"):
+            raise ValueError(
+                f"pool must be 'mean', 'max', or 'attention'; got {pool!r}"
+            )
         self.pool = pool
+        # Lazy attention head — only allocated when actually needed.
+        self.attn_pool: Optional[_AttentionPool] = (
+            _AttentionPool(self.FEATURE_DIM) if pool == "attention" else None
+        )
 
         if freeze:
             self.freeze_backbone(True)
@@ -155,8 +197,11 @@ class EfficientNetB3Encoder(nn.Module):
         # ---- temporal pool -----------------------------------------------
         if self.pool == "mean":
             pooled = feats.mean(dim=1)                    # [B, F]
-        else:  # "max"
+        elif self.pool == "max":
             pooled, _ = feats.max(dim=1)
+        else:                                              # "attention"
+            assert self.attn_pool is not None
+            pooled = self.attn_pool(feats)
 
         if self.head is not None:
             return self.head(pooled)                      # [B, num_classes]
@@ -194,8 +239,14 @@ if __name__ == "__main__":
     enc = EfficientNetB3Encoder(pretrained=False, freeze=True).eval()
     print(f"FEATURE_DIM = {enc.FEATURE_DIM}")
 
-    # 5-D input
+    # 5-D input — all three pool strategies
     x5 = torch.randn(2, 4, 3, 224, 224)
+    for p in ("mean", "max", "attention"):
+        enc_p = EfficientNetB3Encoder(pretrained=False, pool=p).eval()
+        out = enc_p(x5)
+        print(f"  pool={p:9s} → {tuple(out.shape)}")
+        assert out.shape == (2, enc_p.FEATURE_DIM)
+
     emb = enc(x5)
     print(f"  5-D input  {tuple(x5.shape)}  → embedding {tuple(emb.shape)}")
     assert emb.shape == (2, enc.FEATURE_DIM)

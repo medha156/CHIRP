@@ -129,6 +129,7 @@ def build_model_and_step(
             pretrained=cfg.model.pretrained,
             freeze=cfg.model.freeze_backbone,
             num_classes=cfg.model.num_classes,
+            pool=cfg.model.pool,
         )
 
         def step_fn(m: nn.Module, batch: dict) -> tuple[torch.Tensor, torch.Tensor]:
@@ -251,30 +252,30 @@ def append_results(cfg: TrainConfig, row: dict) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# main
+# run_experiment — programmatic entry point used by main() AND ablations
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="CHIRP training entry point.")
-    parser.add_argument("--config", required=True, help="Path to YAML config.")
-    parser.add_argument("--override", nargs="*", default=[],
-                        help="Override config fields, e.g. optim.lr=1e-3 model.dropout=0.4")
-    parser.add_argument("--run-name", default=None,
-                        help="Override run name (defaults to a timestamp).")
-    parser.add_argument("--skip-test", action="store_true",
-                        help="Don't evaluate on the test set at the end.")
-    args = parser.parse_args()
+def run_experiment(
+    cfg: TrainConfig,
+    run_name: str | None = None,
+    *,
+    skip_test: bool = False,
+    write_results_csv: bool = True,
+) -> dict:
+    """Run a single CHIRP experiment from an already-built config.
 
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-
-    # ---- config + seed ----------------------------------------------
-    cfg = TrainConfig.from_yaml(args.config).apply_overrides(args.override)
+    Returns a metrics dict with the same keys written to the results CSV
+    (best_val_acc, best_val_f1, test_acc, test_f1, num_epochs_run, etc.).
+    Suitable for programmatic sweeps — see ``experiments/run_ablations.py``.
+    """
     set_seed(cfg.seed)
     Path(cfg.output_dir).mkdir(parents=True, exist_ok=True)
     cfg.to_yaml(Path(cfg.output_dir) / "config.yaml")        # snapshot
 
-    run_name = args.run_name or f"{cfg.model.model_type}_{dt.datetime.now():%Y%m%d_%H%M%S}"
-    logger.info("Run %s | model=%s | output=%s", run_name, cfg.model.model_type, cfg.output_dir)
+    if run_name is None:
+        run_name = f"{cfg.model.model_type}_{dt.datetime.now():%Y%m%d_%H%M%S}"
+    logger.info("Run %s | model=%s | output=%s",
+                run_name, cfg.model.model_type, cfg.output_dir)
 
     # ---- data --------------------------------------------------------
     dm = CHIRPDataModule(
@@ -298,7 +299,7 @@ def main() -> None:
     # ---- baseline branch --------------------------------------------
     if cfg.model.model_type.startswith("baseline_"):
         bmetrics = run_baselines(cfg, dm)
-        append_results(cfg, {
+        row = {
             "timestamp":       dt.datetime.utcnow().isoformat(timespec="seconds"),
             "run_name":        run_name,
             "model_type":      cfg.model.model_type,
@@ -318,8 +319,10 @@ def main() -> None:
             "test_f1":         float("nan"),
             "test_loss":       float("nan"),
             "checkpoint_path": str(Path(cfg.output_dir) / "baselines"),
-        })
-        return
+        }
+        if write_results_csv:
+            append_results(cfg, row)
+        return row
 
     # ---- gradient-training branch -----------------------------------
     device = torch.device(
@@ -334,18 +337,17 @@ def main() -> None:
 
     # ---- final eval --------------------------------------------------
     trainer.load_best()
-    best_idx = max(range(len(history)),
-                   key=lambda i: history[i].val_f1)
+    best_idx = max(range(len(history)), key=lambda i: history[i].val_f1)
     best = history[best_idx]
 
     test_loss = test_acc = test_f1 = float("nan")
-    if not args.skip_test:
+    if not skip_test:
         test_loss, test_acc, test_f1 = trainer.evaluate(
             dm.test_dataloader(), desc="test",
         )
         logger.info("TEST  loss=%.4f  acc=%.4f  f1=%.4f", test_loss, test_acc, test_f1)
 
-    append_results(cfg, {
+    row = {
         "timestamp":       dt.datetime.utcnow().isoformat(timespec="seconds"),
         "run_name":        run_name,
         "model_type":      cfg.model.model_type,
@@ -365,7 +367,30 @@ def main() -> None:
         "test_f1":         test_f1,
         "test_loss":       test_loss,
         "checkpoint_path": str(trainer.ckpt_dir / "best.pt"),
-    })
+    }
+    if write_results_csv:
+        append_results(cfg, row)
+    return row
+
+
+# ---------------------------------------------------------------------------
+# CLI main — just config parsing + dispatch to run_experiment
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="CHIRP training entry point.")
+    parser.add_argument("--config", required=True, help="Path to YAML config.")
+    parser.add_argument("--override", nargs="*", default=[],
+                        help="Override config fields, e.g. optim.lr=1e-3 model.dropout=0.4")
+    parser.add_argument("--run-name", default=None,
+                        help="Override run name (defaults to a timestamp).")
+    parser.add_argument("--skip-test", action="store_true",
+                        help="Don't evaluate on the test set at the end.")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    cfg = TrainConfig.from_yaml(args.config).apply_overrides(args.override)
+    run_experiment(cfg, run_name=args.run_name, skip_test=args.skip_test)
 
 
 if __name__ == "__main__":

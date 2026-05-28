@@ -115,6 +115,7 @@ class ModelConfig:
     dropout:         float     = 0.3          # fusion only
     n_keyframes:     int       = 4            # frames fed to EfficientNet
     num_classes:     int       = 20
+    pool:            str       = "mean"       # mean | max | attention (efficientnet)
 
 
 @dataclass
