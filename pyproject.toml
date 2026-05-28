@@ -18,7 +18,10 @@ dependencies = [
     # decord is the preferred back-end but has no ARM/py3.12+ wheels yet;
     # install via:  pip install decord  (Linux x86_64 / CUDA) or build from source.
     # The loader falls back to torchvision automatically when decord is absent.
+    # PyAV (av) is required by torchvision.io.read_video for non-trivial codecs
+    # like h264/mp4; without it the loader silently returns zero frames.
     "opencv-python>=4.9.0,<5.0.0",
+    "av>=14,<18",
 
     # Numerical / data
     "numpy>=1.26.0,<2.0.0",

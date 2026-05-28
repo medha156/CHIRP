@@ -1,0 +1,50 @@
+# Compact config for end-to-end integration tests on synthetic data.
+# Uses pretrained=False so no weight downloads, and small T/batch for CPU speed.
+
+seed: 42
+num_epochs: 3
+output_dir: outputs/runs/synthetic_smoke
+early_stopping_patience: 99           # never early-stop in smoke runs
+early_stopping_metric: val_f1
+device: cpu
+
+data:
+  data_root: data/synthetic
+  datasets: [fbd_sv_2024, vb100]
+  splits: [0.70, 0.15, 0.15]
+  batch_size: 4
+  num_workers: 0                       # avoid macOS fork issues + keep it deterministic
+  num_frames: 8
+  height: 96                           # match synthetic clip resolution
+  width: 96
+  backend: torchvision                 # decord not present on this env
+  balance_sampler: false
+  use_optical_flow: false
+  optical_flow_backend: farneback
+  raft_model: small
+
+model:
+  model_type: fusion
+  pretrained: false                    # CRITICAL: no weight downloads
+  freeze_backbone: false
+  hidden_dim: 128
+  dropout: 0.2
+  n_keyframes: 4
+  num_classes: 20
+  pool: mean
+
+optim:
+  lr: 5.0e-4
+  weight_decay: 1.0e-2
+  warmup_epochs: 1
+  min_lr: 1.0e-6
+  grad_clip: 1.0
+  label_smoothing: 0.0                 # cleaner loss curves at small scale
+
+log:
+  wandb: false                         # no external services in smoke
+  wandb_project: chirp
+  wandb_run_name: null
+  wandb_entity: null
+  results_csv: outputs/synthetic_results.csv
+  log_every: 5

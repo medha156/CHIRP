@@ -383,7 +383,18 @@ def main() -> None:
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
-    model.load_state_dict(ckpt["model"])
+    state = ckpt["model"]
+
+    # Fusion checkpoints (SwinEffNetFusion) store Swin params under a
+    # "swin." prefix. Detect and unwrap so the same Swin-T loader works
+    # for both pure-Swin and fusion checkpoints.
+    if any(k.startswith("swin.") for k in state):
+        state = {k[len("swin."):]: v for k, v in state.items()
+                 if k.startswith("swin.")}
+        logger.info("Detected fusion checkpoint — unwrapped %d Swin params",
+                    len(state))
+
+    model.load_state_dict(state)
     model = model.to(device).eval()
     logger.info("Loaded Swin-T checkpoint %s", args.checkpoint)
 
