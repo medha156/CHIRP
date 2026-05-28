@@ -31,9 +31,9 @@ if __package__ in (None, ""):
 import logging
 import math
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 import torch
 import torch.nn as nn
@@ -345,7 +345,7 @@ class Trainer:
         )
         return path
 
-    def load_best(self) -> Optional[dict]:
+    def load_best(self) -> dict | None:
         """Load the best checkpoint into the model and return its metadata."""
         path = self.ckpt_dir / "best.pt"
         if not path.exists():

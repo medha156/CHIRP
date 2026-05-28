@@ -65,6 +65,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -439,8 +440,9 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    fig_dir = Path(args.fig_dir); fig_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir = Path(args.fig_dir)
 
+    fig_dir.mkdir(parents=True, exist_ok=True)
     if args.plot_only:
         csv_path = Path(args.csv or args.out_csv)
         if not csv_path.exists():

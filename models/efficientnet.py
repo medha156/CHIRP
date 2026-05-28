@@ -34,7 +34,7 @@ the temporal pool.
 from __future__ import annotations
 
 import logging
-from typing import Literal, Optional
+from typing import Literal
 
 import torch
 from torch import Tensor, nn
@@ -131,14 +131,14 @@ class EfficientNetB3Encoder(nn.Module):
             )
         self.pool = pool
         # Lazy attention head — only allocated when actually needed.
-        self.attn_pool: Optional[_AttentionPool] = (
+        self.attn_pool: _AttentionPool | None = (
             _AttentionPool(self.FEATURE_DIM) if pool == "attention" else None
         )
 
         if freeze:
             self.freeze_backbone(True)
 
-        self.head: Optional[nn.Linear] = None
+        self.head: nn.Linear | None = None
         if num_classes > 0:
             self.head = nn.Linear(self.FEATURE_DIM, num_classes)
 
@@ -151,7 +151,7 @@ class EfficientNetB3Encoder(nn.Module):
 
     # ------------------------------------------------------------------
 
-    def forward(self, x: Tensor, t: Optional[int] = None) -> Tensor:
+    def forward(self, x: Tensor, t: int | None = None) -> Tensor:
         """Encode every frame, then pool across time.
 
         Parameters
@@ -210,7 +210,7 @@ class EfficientNetB3Encoder(nn.Module):
     # ------------------------------------------------------------------
 
     @torch.no_grad()
-    def extract_embeddings(self, x: Tensor, t: Optional[int] = None) -> Tensor:
+    def extract_embeddings(self, x: Tensor, t: int | None = None) -> Tensor:
         """Always return the pooled ``[B, 1536]`` features, regardless of head."""
         head_backup = self.head
         self.head = None

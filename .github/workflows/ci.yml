@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same PR/branch when a new commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: "1"
+  # The tests don't actually hit Anthropic / WandB, but exposing the
+  # secrets here means any future integration test can read them without
+  # workflow changes.
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+  WANDB_MODE: "disabled"     # belt-and-braces: never call the real API in CI
+  NO_ALBUMENTATIONS_UPDATE: "1"
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Lint
+  # -------------------------------------------------------------------------
+  lint:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install ruff
+        run: pip install "ruff>=0.4,<1.0"
+
+      - name: ruff check
+        run: ruff check .
+
+  # -------------------------------------------------------------------------
+  # Unit tests (CPU-only, no model weights, no real videos)
+  # -------------------------------------------------------------------------
+  test:
+    name: Pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      # System dep: OpenCV needs libGL on headless Linux runners.
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglib2.0-0 ffmpeg
+
+      # Install CPU-only PyTorch first so we don't pull the ~3 GB CUDA wheel.
+      - name: Install CPU PyTorch
+        run: |
+          pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu \
+            "torch>=2.2.0,<2.5.0" "torchvision>=0.17.0,<0.20.0"
+
+      # Then the project itself (skips torch reinstall thanks to pip's
+      # already-satisfied check).
+      - name: Install project + dev extras
+        run: pip install -e ".[dev]"
+
+      - name: Show installed package versions
+        run: pip list
+
+      - name: Run unit tests
+        run: pytest tests/ -v --no-cov --tb=short --maxfail=5

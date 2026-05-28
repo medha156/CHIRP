@@ -39,6 +39,7 @@ import logging
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -179,9 +180,10 @@ def main() -> None:
         cfg.device = args.device
 
     run_name = args.run_name or Path(args.checkpoint).parent.parent.name
-    fig_dir     = Path(args.fig_dir);     fig_dir.mkdir(parents=True, exist_ok=True)
-    metrics_dir = Path(args.metrics_dir); metrics_dir.mkdir(parents=True, exist_ok=True)
-
+    fig_dir = Path(args.fig_dir)
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    metrics_dir = Path(args.metrics_dir)
+    metrics_dir.mkdir(parents=True, exist_ok=True)
     # ---- data --------------------------------------------------------
     dm = CHIRPDataModule(
         data_root=cfg.data.data_root,

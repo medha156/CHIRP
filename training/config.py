@@ -185,14 +185,14 @@ class TrainConfig:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "TrainConfig":
+    def from_yaml(cls, path: str | Path) -> TrainConfig:
         path = Path(path)
         with path.open() as f:
             raw = yaml.safe_load(f) or {}
         return cls.from_dict(raw)
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any]) -> "TrainConfig":
+    def from_dict(cls, raw: dict[str, Any]) -> TrainConfig:
         """Build a config from a nested dict, falling back to defaults."""
         sub = {"data": DataConfig, "model": ModelConfig,
                "optim": OptimConfig, "log": LogConfig}
@@ -223,7 +223,7 @@ class TrainConfig:
     # CLI overrides
     # ------------------------------------------------------------------
 
-    def apply_overrides(self, overrides: list[str]) -> "TrainConfig":
+    def apply_overrides(self, overrides: list[str]) -> TrainConfig:
         """Apply ``key=value`` strings to nested fields.
 
         Supports dotted paths into sub-configs, e.g.::

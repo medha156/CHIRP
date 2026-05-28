@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Literal
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -55,10 +56,12 @@ import shap
 import torch
 
 from models.baselines import (  # noqa: E402
-    extract_features, load_baseline, load_cached_features,
+    extract_features,
+    load_baseline,
+    load_cached_features,
 )
 from models.efficientnet import EfficientNetB3Encoder  # noqa: E402
-from pipelines.video_dataset import NUM_CLASSES, SPECIES  # noqa: E402
+from pipelines.video_dataset import SPECIES  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +265,9 @@ def main() -> None:
     )
     logger.info("SHAP values shape: %s", sv.shape)
 
-    fig_dir = Path(args.fig_dir); fig_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir = Path(args.fig_dir)
+
+    fig_dir.mkdir(parents=True, exist_ok=True)
     plot_shap_summary(
         sv, X_explained,
         out_path=fig_dir / f"shap_{args.baseline}.png",

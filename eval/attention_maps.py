@@ -55,9 +55,9 @@ if __package__ in (None, ""):
 import argparse
 import logging
 from pathlib import Path
-from typing import Callable
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,7 +67,8 @@ from torch import Tensor, nn
 
 from models.swin_t import VideoSwinT  # noqa: E402
 from pipelines.preprocess import (  # noqa: E402
-    imagenet_normalize, resize_preserve_aspect, to_swin_layout,
+    imagenet_normalize,
+    to_swin_layout,
 )
 from pipelines.video_dataset import NUM_CLASSES, SPECIES  # noqa: E402
 from training.config import TrainConfig  # noqa: E402
@@ -370,7 +371,8 @@ def main() -> None:
 
     cfg = TrainConfig.from_yaml(args.config)
     run_name = args.run_name or Path(args.checkpoint).parent.parent.name
-    fig_dir = Path(args.fig_dir); fig_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir = Path(args.fig_dir)
+    fig_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- build model + load checkpoint -------------------------------
     in_channels = 5 if cfg.data.use_optical_flow else 3

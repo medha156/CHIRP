@@ -36,8 +36,8 @@ Responsibilities
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -119,8 +119,8 @@ class CHIRPDataModule:
         n_frames: int = 16,
         height: int = 224,
         width: int = 224,
-        train_transform: Optional[Callable] = None,
-        eval_transform: Optional[Callable] = None,
+        train_transform: Callable | None = None,
+        eval_transform: Callable | None = None,
         backend: str = "auto",
         balance_sampler: bool = False,
     ) -> None:
@@ -265,7 +265,7 @@ class CHIRPDataModule:
         self,
         df: pd.DataFrame,
         split: str,
-        transform: Optional[Callable],
+        transform: Callable | None,
         shuffle: bool,
     ) -> DataLoader:
         # CHIRPVideoDataset expects a CSV path; round-trip through a temp CSV

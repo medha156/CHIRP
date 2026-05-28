@@ -42,15 +42,16 @@ import csv
 import datetime as dt
 import logging
 import random
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import torch
 import torch.nn as nn
 
 from models.baselines import (  # noqa: E402
-    extract_features, train_baselines,
+    extract_features,
+    train_baselines,
 )
 from models.efficientnet import EfficientNetB3Encoder  # noqa: E402
 from models.fusion import FusionHead, SwinEffNetFusion  # noqa: E402
@@ -59,9 +60,11 @@ from pipelines.augment import build_augment  # noqa: E402
 from pipelines.datamodule import CHIRPDataModule  # noqa: E402
 from pipelines.optical_flow import build_optical_flow  # noqa: E402
 from pipelines.preprocess import (  # noqa: E402
-    Preprocessor, imagenet_normalize, resize_preserve_aspect, to_swin_layout,
+    Preprocessor,
+    imagenet_normalize,
+    resize_preserve_aspect,
+    to_swin_layout,
 )
-from pipelines.video_dataset import NUM_CLASSES  # noqa: E402
 from training.config import TrainConfig  # noqa: E402
 from training.trainer import Trainer  # noqa: E402
 

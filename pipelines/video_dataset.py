@@ -32,10 +32,9 @@ Example::
 from __future__ import annotations
 
 import logging
-import math
-import random
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Literal, Optional, Sequence
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -280,9 +279,9 @@ class CHIRPVideoDataset(Dataset):
         height: int = 224,
         width: int = 224,
         split: Literal["train", "val", "test"] = "train",
-        transform: Optional[Callable[[Tensor], Tensor]] = None,
+        transform: Callable[[Tensor], Tensor] | None = None,
         backend: Literal["auto", "decord", "torchvision"] = "auto",
-        root_dir: Optional[str | Path] = None,
+        root_dir: str | Path | None = None,
     ) -> None:
         super().__init__()
 
@@ -450,9 +449,9 @@ def build_dataloader(
     width: int = 224,
     batch_size: int = 16,
     num_workers: int = 4,
-    transform: Optional[Callable[[Tensor], Tensor]] = None,
+    transform: Callable[[Tensor], Tensor] | None = None,
     backend: Literal["auto", "decord", "torchvision"] = "auto",
-    root_dir: Optional[str | Path] = None,
+    root_dir: str | Path | None = None,
     balance_classes: bool = False,
     pin_memory: bool = True,
 ) -> DataLoader:
@@ -578,7 +577,7 @@ if __name__ == "__main__":
     )
 
     print(loader.dataset)
-    print(f"\nIterating first 3 batches …")
+    print("\nIterating first 3 batches …")
     t0 = time.perf_counter()
     for i, batch in enumerate(loader):
         frames = batch["frames"]

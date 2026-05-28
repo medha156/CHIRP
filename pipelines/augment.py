@@ -28,7 +28,8 @@ Design notes
 from __future__ import annotations
 
 import logging
-from typing import Literal, Mapping
+from collections.abc import Mapping
+from typing import Literal
 
 import albumentations as A
 import numpy as np

@@ -95,7 +95,10 @@ class _RaftFlow:
     def __init__(self, model_size: Literal["small", "large"] = "small",
                  device: str | torch.device = "cpu") -> None:
         from torchvision.models.optical_flow import (
-            Raft_Large_Weights, Raft_Small_Weights, raft_large, raft_small,
+            Raft_Large_Weights,
+            Raft_Small_Weights,
+            raft_large,
+            raft_small,
         )
 
         if model_size == "small":
