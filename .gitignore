@@ -63,6 +63,8 @@ data/vb100/
 data/birds525/
 data/inaturalist/
 data/merged/
+data/merged_small/
+data/_splits_cache/
 # Split CSVs are typically generated; commit only if small and deliberate.
 data/splits/*.csv
 *.mp4

@@ -1,0 +1,51 @@
+# Mini-sweep config: real data, pretrained backbones, small budget.
+# Used by experiments/mini_sweep.py to produce Milestone 3 deliverables.
+
+seed: 42
+num_epochs: 8                          # short — pretrained backbones converge fast
+output_dir: outputs/runs/mini_sweep
+early_stopping_patience: 5
+early_stopping_metric: val_f1
+device: cpu
+
+data:
+  data_root: data                      # not used (paths in merged CSV are absolute)
+  datasets: [merged_small]             # placeholder — driver overrides with custom CSV path
+  splits: [0.70, 0.15, 0.15]
+  batch_size: 8
+  num_workers: 0
+  num_frames: 4
+  height: 224
+  width: 224
+  backend: auto                        # prefers decord → PyAV → torchvision
+  balance_sampler: true                # class imbalance is real (13 vs 30 per class)
+  use_optical_flow: false
+  optical_flow_backend: farneback
+  raft_model: small
+
+model:
+  model_type: efficientnet
+  pretrained: true                     # CRITICAL — only-real-data results need these
+  freeze_backbone: true                # linear-probe: only the head trains
+                                       # — 10× faster on CPU than full FT, still scientifically meaningful
+  hidden_dim: 256
+  dropout: 0.2
+  n_keyframes: 4
+  num_classes: 20
+  pool: mean
+
+optim:
+  lr: 1.0e-3                           # higher LR — only training the head
+  weight_decay: 1.0e-4                 # less reg needed with frozen backbone
+  warmup_epochs: 1
+  min_lr: 1.0e-6
+  grad_clip: 1.0
+  label_smoothing: 0.05
+
+log:
+  wandb: false
+  wandb_project: chirp
+  wandb_run_name: null
+  wandb_entity: null
+  results_csv: outputs/mini_sweep_results.csv
+  log_every: 20

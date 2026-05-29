@@ -105,7 +105,13 @@ class CHIRPDataModule:
     >>> dm.plot_class_distribution("outputs/class_distribution.png")
     """
 
-    KNOWN_DATASETS = ("fbd_sv_2024", "vb100")
+    # Known per-source datasets, plus the unified `merged_small` and `merged`
+    # built by experiments/build_index.py from the 3-source pipeline.
+    KNOWN_DATASETS = (
+        "fbd_sv_2024", "vb100",
+        "birds525", "inaturalist",
+        "merged", "merged_small",
+    )
 
     def __init__(
         self,
