@@ -1,8 +1,22 @@
 # CHIRP — Pipeline Integration Report
 
-**Generated:** 2026-05-28
+**Generated:** 2026-05-29 (updated)
 **Environment:** macOS 24.6.0 (arm64) · Python 3.12.13 · PyTorch CPU
-**Scope:** End-to-end pipeline verification using a **synthetic video dataset**. Real-dataset (FBD-SV-2024, VB100) accuracy numbers are **not** in this report — those datasets require research-license downloads and meaningful training requires GPU. The pipeline-readiness verdict, however, is supported by every code path being exercised here.
+**Scope:** End-to-end pipeline verification with both **synthetic data** AND a **real 5,966-sample dataset** built from three free public sources (VB100 videos + Birds-525 photos + iNaturalist photos). Real-data accuracy numbers from GPU training still pending — the bottleneck remains CPU speed on this laptop, not data availability.
+
+## Update — real-data pipeline is now live
+
+Since the original report, three things changed:
+
+1. **Real data is downloaded and indexed.** 5,966 samples covering all 20 Stanford species: 76 video clips from VB100 (5 species) + 1,176 photos from Birds-525 (8 species) + 4,714 photos from iNaturalist Bay Area observations (8 species). See `data/merged/index.csv` and [`outputs/figures/merged_class_distribution.png`](outputs/figures/merged_class_distribution.png).
+
+2. **Two real bugs fixed:**
+   - `CHIRPVideoDataset` now handles still images (JPG/PNG) by replicating them across T frames — needed for the mixed video+photo dataset.
+   - Added a **direct PyAV backend** because `torchvision.io.read_video` is broken on macOS arm64 (fails with "Resource temporarily unavailable" on the swscaler init).
+
+3. **README updated** to reflect that VB100 is actually freely downloadable on Zenodo (CC BY-NC-SA 4.0), not behind a research-license wall as the original plan claimed.
+
+The data-availability blocker is now gone. The only remaining blocker for real accuracy numbers is **GPU compute** — the integration report's CPU timing estimates still apply.
 
 ---
 

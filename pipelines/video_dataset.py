@@ -151,6 +151,56 @@ def _decode_with_decord(
     return frames
 
 
+def _decode_with_pyav(
+    path: str,
+    indices: np.ndarray,
+    height: int,
+    width: int,
+) -> Tensor:
+    """Decode specific frame indices with PyAV directly.
+
+    More reliable than ``torchvision.io.read_video`` on macOS arm64,
+    where the torchvision wrapper occasionally fails with
+    "Failed initializing scaling graph (Resource temporarily unavailable)".
+    """
+    import av
+
+    wanted = set(int(i) for i in indices)
+    max_idx = max(wanted) if wanted else 0
+
+    container = av.open(path)
+    try:
+        stream = container.streams.video[0]
+        # Disable threading to avoid the swscaler resource issue.
+        stream.thread_type = "NONE"
+
+        frames_by_idx: dict[int, np.ndarray] = {}
+        for i, frame in enumerate(container.decode(stream)):
+            if i in wanted:
+                arr = frame.to_ndarray(format="rgb24")     # [H, W, 3] uint8
+                frames_by_idx[i] = arr
+            if i >= max_idx:
+                break
+    finally:
+        container.close()
+
+    # Build the output in the requested order.
+    import torchvision.transforms.functional as TF
+    out_frames = []
+    for idx in indices:
+        arr = frames_by_idx.get(int(idx))
+        if arr is None:
+            # Fell off the end — use the last we got.
+            if frames_by_idx:
+                arr = frames_by_idx[max(frames_by_idx)]
+            else:
+                arr = np.zeros((height, width, 3), dtype=np.uint8)
+        t = torch.from_numpy(arr.copy()).permute(2, 0, 1)  # [C, H, W] uint8
+        t = TF.resize(t, [height, width], antialias=True)
+        out_frames.append(t)
+    return torch.stack(out_frames).float() / 255.0
+
+
 def _decode_with_torchvision(
     path: str,
     indices: np.ndarray,
@@ -187,6 +237,29 @@ def _decode_with_torchvision(
     return frames.float() / 255.0
 
 
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def _decode_image_as_clip(
+    path: str,
+    n_frames: int,
+    height: int,
+    width: int,
+) -> Tensor:
+    """Load a still image and replicate it across ``n_frames`` to form a clip.
+
+    Mixed video+photo datasets (like CHIRP's VB100+Birds-525+iNaturalist
+    blend) pass single-frame JPGs through the same pipeline as real
+    videos. The picture-only branch treats each as a 1-frame "video";
+    other branches use the same frame replicated T times.
+    """
+    from PIL import Image
+    img = Image.open(path).convert("RGB").resize((width, height), Image.BILINEAR)
+    arr = np.array(img, dtype=np.uint8)                  # writable [H, W, C]
+    frame = torch.from_numpy(arr).permute(2, 0, 1).float() / 255.0  # [C, H, W]
+    return frame.unsqueeze(0).expand(n_frames, -1, -1, -1).contiguous()
+
+
 def decode_clip(
     path: str,
     indices: np.ndarray,
@@ -194,14 +267,17 @@ def decode_clip(
     width: int,
     backend: Literal["auto", "decord", "torchvision"] = "auto",
 ) -> Tensor:
-    """Decode a set of frame indices from a video file.
+    """Decode a set of frame indices from a video file (or a single image).
 
     Parameters
     ----------
     path:
-        Absolute or relative path to the video clip.
+        Absolute or relative path to the video clip — *or* to a still
+        image (JPG/PNG/WEBP/etc.), in which case the image is replicated
+        across ``len(indices)`` frames.
     indices:
-        1-D integer array of frame indices to extract.
+        1-D integer array of frame indices to extract. For still-image
+        inputs only ``len(indices)`` matters; the actual values are ignored.
     height, width:
         Spatial resolution to resize frames to.
     backend:
@@ -213,18 +289,30 @@ def decode_clip(
     -------
     FloatTensor ``[T, C, H, W]`` in ``[0, 1]``.
     """
+    # Still-image fast path — replicate the frame T times.
+    ext = "." + path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    if ext in IMAGE_EXTENSIONS:
+        return _decode_image_as_clip(path, len(indices), height, width)
+
     if backend == "decord" or (backend == "auto" and _DECORD_AVAILABLE):
         try:
             return _decode_with_decord(path, indices, height, width)
         except Exception as exc:
             if backend == "decord":
                 raise
-            logger.debug("decord failed (%s) — retrying with torchvision", exc)
+            logger.debug("decord failed (%s) — retrying with pyav/torchvision", exc)
+
+    # Prefer direct PyAV over torchvision.io.read_video on macOS arm64,
+    # where the torchvision wrapper hits "Resource temporarily unavailable".
+    try:
+        return _decode_with_pyav(path, indices, height, width)
+    except Exception as exc:
+        logger.debug("PyAV failed (%s) — retrying with torchvision", exc)
 
     if not _TORCHVISION_AVAILABLE:
         raise RuntimeError(
-            "Neither decord nor torchvision is available. "
-            "Install at least one: pip install decord  OR  pip install torchvision"
+            "Neither decord, PyAV, nor torchvision is available. "
+            "Install at least one: pip install decord OR pip install av OR pip install torchvision"
         )
     return _decode_with_torchvision(path, indices, height, width)
 
@@ -414,14 +502,36 @@ class CHIRPVideoDataset(Dataset):
 # ---------------------------------------------------------------------------
 
 def _count_frames(path: str, backend: Literal["auto", "decord", "torchvision"]) -> int:
-    """Return the total number of frames in *path* as cheaply as possible."""
+    """Return the total number of frames in *path* as cheaply as possible.
+
+    Still images (.jpg / .png / etc.) report as 1 frame.
+    """
+    ext = "." + path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    if ext in IMAGE_EXTENSIONS:
+        return 1
+
     if backend in ("auto", "decord") and _DECORD_AVAILABLE:
         try:
             import decord
             vr = decord.VideoReader(path, num_threads=1)
             return len(vr)
         except Exception:
-            pass  # fall through to torchvision
+            pass  # fall through to PyAV / torchvision
+
+    # PyAV is much more reliable on macOS arm64 than torchvision.io.
+    try:
+        import av
+        container = av.open(path)
+        try:
+            stream = container.streams.video[0]
+            if stream.frames:
+                return int(stream.frames)
+            # Fall back to duration × rate if `.frames` is unset.
+            return int((stream.duration or 0) * (stream.average_rate or 30))
+        finally:
+            container.close()
+    except Exception:
+        pass
 
     if _TORCHVISION_AVAILABLE:
         try:

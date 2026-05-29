@@ -75,49 +75,48 @@ The loader auto-detects decord and falls back to torchvision otherwise — no co
 
 ## Datasets
 
-CHIRP is trained on two bird-video corpora:
+CHIRP uses **three free, openly-downloadable sources** to cover the 20 Stanford species — none requires a research-license email. The earlier project plan named FBD-SV-2024 and VB100 as primary sources; investigation showed FBD-SV-2024 doesn't have species labels and VB100 only covers 5 of our 20 species, so the actual mix is:
 
-### FBD-SV-2024 — Flying Bird Detection, Surveillance Video (2024)
+| Source | Type | Stanford species covered | License | Where |
+|---|---|---|---|---|
+| **VB100** | Videos | **5** (Acorn Woodpecker, Black Phoebe, California Towhee, Red-tailed Hawk, White-crowned Sparrow) | CC BY-NC-SA 4.0 | [Zenodo 60375](https://zenodo.org/record/60375) (9.7 GB) |
+| **Birds-525** | Photos | **8** (American Robin, Anna's Hummingbird, Brewer's Blackbird, Dark-eyed Junco, House Finch, Mourning Dove, Northern Mockingbird, Red-tailed Hawk) | CC0 | [HuggingFace](https://huggingface.co/datasets/yashikota/birds-525-species-image-classification) (~2 GB) |
+| **iNaturalist** | Photos | **8 gap species** (American Crow, Bushtit, California Scrub-Jay, Chestnut-backed Chickadee, Cooper's Hawk, Lesser Goldfinch, Oak Titmouse, Yellow-rumped Warbler) | CC0 / CC-BY / CC-BY-NC per photo | [api.inaturalist.org](https://api.inaturalist.org) |
 
-- **Source**: arXiv 2409.00317 ([paper](https://arxiv.org/abs/2409.00317))
-- Surveillance-camera clips of flying birds (small, fast-moving)
-- Released by the authors under a research license — request access via the contact in the paper
+iNaturalist only stores **photos** and **sounds** — no video media type exists in their data model. So 5 of our 20 classes get real videos (VB100); the other 15 get photos that the CHIRP pipeline treats as 1-frame "videos" via `num_frames=1`. This is honest: a 20-class classifier trained on mixed video + photo input.
 
-### VB100 — Video-Bird 100-class dataset
+### One-command pull
 
-- **Source**: Ge et al., CVPR 2017 Workshops ([paper](https://openaccess.thecvf.com/content_cvpr_2017_workshops/w8/papers/Ge_Animal_Recognition_in_CVPR_2017_paper.pdf))
-- 100 bird species, naturalistic video clips
-- Available via the original authors — see paper for request instructions
+```bash
+# 1. VB100 videos — 9.7 GB across 22 archives
+mkdir -p data/raw/vb100/archives && cd data/raw/vb100/archives
+for i in $(seq -w 01 22); do
+    curl -L -O "https://zenodo.org/record/60375/files/vb100_video_${i}.zip"
+done
+for f in *.zip; do unzip -q "$f" -d ../extracted/; done
+cd -
 
-### Expected on-disk layout
+# 2. iNaturalist photos for the 8 gap species (Bay Area, research-grade, CC)
+poetry run python experiments/scrape_inaturalist.py \
+    --species-set gap --max-per-species 300 --out data/inaturalist
 
-After downloading, organise as follows:
+# 3. Birds-525 photos (downloaded inline by build_index.py)
 
-```
-data/
-├── fbd_sv_2024/
-│   ├── index.csv           # required: columns path, label, species
-│   └── clips/              # actual .mp4 / .avi files (path entries
-│                           # in index.csv are relative to this dir)
-└── vb100/
-    ├── index.csv
-    └── clips/
-```
-
-### Building `index.csv`
-
-Each `index.csv` must have **at minimum**: `path`, `label`, `species`. Labels are integer class indices 0–19 matching the [Stanford taxonomy in `pipelines/video_dataset.py`](pipelines/video_dataset.py).
-
-Example for FBD-SV-2024:
-
-```csv
-path,label,species
-clips/anna_hummingbird/clip_0001.mp4,3,Anna's Hummingbird
-clips/california_scrub_jay/clip_0042.mp4,7,California Scrub-Jay
-clips/red_tailed_hawk/clip_0117.mp4,17,Red-tailed Hawk
+# 4. Build the unified CHIRP index.csv
+poetry run python experiments/build_index.py \
+    --vb100-extracted data/raw/vb100/extracted \
+    --birds525-out    data/birds525 \
+    --inat-index      data/inaturalist/index.csv \
+    --unified-out     data/merged/index.csv
 ```
 
-Many datasets ship with their own taxonomy; you'll need to write a small mapping script from the source labels to the 20-class CHIRP labels.
+After this you'll have:
+- `data/vb100/index.csv` — 5 species × ~14 video clips
+- `data/birds525/index.csv` — 8 species × ≤200 photos each
+- `data/inaturalist/index.csv` — 8 species × ≤300 photos each
+- `data/merged/index.csv` — concatenated all-sources index for training
+
+The `index.csv` schema is `path, label, species, source, modality, license`. The `source` and `modality` columns let downstream code branch (e.g. set `num_frames=1` automatically when `modality==photo`).
 
 ---
 
